@@ -1,0 +1,5 @@
+name: IronTideStuff
+version: ${project.version}
+main: com.github.xt449.irontidestuff.IronTideStuff
+api-version: 1.16
+authors: [xt449]
