@@ -48,12 +48,12 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
+    private void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
         updatePlayerListName(event.getPlayer(), event.getPlayer().getWorld().getEnvironment());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerJoin(PlayerJoinEvent event) {
+    private void onPlayerJoin(PlayerJoinEvent event) {
         updatePlayerListName(event.getPlayer(), event.getPlayer().getWorld().getEnvironment());
     }
 

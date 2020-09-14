@@ -6,10 +6,13 @@
 
     <groupId>com.github.xt449</groupId>
     <artifactId>irontidestuff</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <packaging>jar</packaging>
+    <version>${minecraft.version}-1.0.0</version>
 
     <name>IronTideStuff</name>
+
+    <properties>
+        <minecraft.version>1.16.3</minecraft.version>
+    </properties>
 
     <repositories>
         <repository>
@@ -27,7 +30,7 @@
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-            <version>1.16.3-R0.1-SNAPSHOT</version>
+            <version>${minecraft.version}-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
 
