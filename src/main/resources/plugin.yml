@@ -3,3 +3,13 @@ name: ${project.name}
 version: ${project.version}
 author: xt449
 api-version: '1.16'
+
+commands:
+  duel:
+    usage: /<command> <player>
+    aliases: [challenge]
+    permission: ${project.artifactId}.command.duel
+
+permissions:
+  ${project.artifactId}.command.duel:
+    default: true
