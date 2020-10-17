@@ -2,6 +2,7 @@ package com.github.xt449.irontidestuff;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -16,6 +17,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.projectiles.ProjectileSource;
 
@@ -177,7 +179,13 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     private void onPlayerJoin(PlayerJoinEvent event) {
-        updatePlayerListName(event.getPlayer(), event.getPlayer().getWorld().getEnvironment());
+        final Player player = event.getPlayer();
+
+        if(!player.hasPlayedBefore()) {
+            player.getInventory().addItem(new ItemStack(Material.OAK_BOAT));
+        }
+
+        updatePlayerListName(player, player.getWorld().getEnvironment());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
