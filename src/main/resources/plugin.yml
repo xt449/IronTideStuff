@@ -9,7 +9,25 @@ commands:
     usage: /<command> <player>
     aliases: [challenge]
     permission: ${project.artifactId}.command.duel
+  leaveduel:
+    usage: /<command>
+    aliases: [duelleave,leavechallenge,challengeleave,abandonduel,duelabandon,abandonchallenge,challengeabandon]
+    permission: ${project.artifactId}.command.leaveduel
+  acceptduel:
+    usage: /<command>
+    aliases: [duelaccept,acceptchallenge,challengeaccept]
+    permission: ${project.artifactId}.command.acceptduel
+  declineduel:
+    usage: /<command>
+    aliases: [dueldecline,declinechallenge,challengedecline,denyduel,dueldeny,denychallenge,challengedeny]
+    permission: ${project.artifactId}.command.declineduel
 
 permissions:
   ${project.artifactId}.command.duel:
+    default: true
+  ${project.artifactId}.command.leaveduel:
+    default: true
+  ${project.artifactId}.command.acceptduel:
+    default: true
+  ${project.artifactId}.command.declineduel:
     default: true

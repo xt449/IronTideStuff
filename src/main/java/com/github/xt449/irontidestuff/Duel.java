@@ -1,6 +1,8 @@
 package com.github.xt449.irontidestuff;
 
-import java.util.HashSet;
+import org.bukkit.entity.Player;
+
+import java.util.HashMap;
 import java.util.UUID;
 
 /**
@@ -8,15 +10,18 @@ import java.util.UUID;
  */
 class Duel {
 
-	final HashSet<UUID> particpants = new HashSet<>();
+	final HashMap<UUID, Boolean> participants = new HashMap<>();
 
 	boolean started = false;
 
-	/*void addParticipant(Player player) {
-		particpants.add(player.getUniqueId());
+	public Duel(UUID creator, UUID... invitations) {
+		participants.put(creator, true);
+		for(int i = 0; i < invitations.length; i++) {
+			participants.put(invitations[i], false);
+		}
 	}
 
-	void removeParticipant(Player player) {
-		particpants.remove(player.getUniqueId());
-	}*/
+	boolean isParticipant(Player player) {
+		return participants.getOrDefault(player.getUniqueId(), false);
+	}
 }

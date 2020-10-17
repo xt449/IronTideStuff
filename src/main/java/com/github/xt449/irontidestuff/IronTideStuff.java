@@ -15,6 +15,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.projectiles.ProjectileSource;
 
@@ -64,6 +65,108 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if(sender instanceof Player) {
+            if(command.getName().equals("duel")) {
+                final Player player = (Player) sender;
+                final UUID playerId = player.getUniqueId();
+                Duel duel = duelMap.get(playerId);
+
+                if(duel != null) {
+                    sender.sendMessage(ChatColor.RED + "You are already in a duel!");
+                    return true;
+                }
+
+                if(args.length == 0) {
+                    return false;
+                }
+
+                final Player target = Bukkit.getPlayer(args[0]);
+
+                if(target == null) {
+                    sender.sendMessage(ChatColor.RED + "Invalid username!");
+                    return true;
+                }
+
+                final UUID targetId = target.getUniqueId();
+                duel = duelMap.get(targetId);
+
+                if(duel != null) {
+                    sender.sendMessage(ChatColor.RED + "This player is already in a duel or has a pending request!");
+                    return true;
+                }
+
+                duel = new Duel(playerId, targetId);
+                duelMap.put(playerId, duel);
+                duelMap.put(targetId, duel);
+                target.sendMessage(ChatColor.AQUA + "You have challenged " + target.getName() + " to a duel");
+                target.sendMessage(ChatColor.AQUA + "You have be challenged to a duel by " + player.getName() + ChatColor.GREEN + "\nTo accept: /acceptduel " + player.getName() + ChatColor.RED + "\nTo decline: /declineduel " + player.getName());
+                return true;
+            } else if(command.getName().equals("leaveduel")) {
+                final Player player = (Player) sender;
+                final UUID playerId = player.getUniqueId();
+                Duel duel = duelMap.get(playerId);
+
+                if(duel == null) {
+                    sender.sendMessage(ChatColor.RED + "You are not in a duel!");
+                    return true;
+                }
+
+                duel.participants.remove(playerId);
+                duelMap.remove(playerId);
+                duel.participants.forEach((id, accepted) -> {
+                    if(accepted) {
+                        Bukkit.getPlayer(id).sendMessage(ChatColor.RED + player.getName() + " has left the duel");
+                    }
+                });
+                if(duel.participants.size() == 1) {
+                    duelMap.remove(duel.participants.keySet().iterator().next());
+                }
+                sender.sendMessage(ChatColor.AQUA + "You have left the duel");
+                return true;
+            } else if(command.getName().equals("acceptduel")) {
+                final Player player = (Player) sender;
+                final UUID playerId = player.getUniqueId();
+                Duel duel = duelMap.get(playerId);
+
+                if(duel == null) {
+                    sender.sendMessage(ChatColor.RED + "You have no pending requests!");
+                    return true;
+                }
+
+                duel.participants.forEach((id, accepted) -> {
+                    if(accepted) {
+                        Bukkit.getPlayer(id).sendMessage(ChatColor.GREEN + player.getName() + " has joined the duel");
+                    }
+                });
+                duel.participants.put(playerId, true);
+                sender.sendMessage(ChatColor.AQUA + "You have joined the duel");
+                return true;
+            } else if(command.getName().equals("declineduel")) {
+                final Player player = (Player) sender;
+                final UUID playerId = player.getUniqueId();
+                Duel duel = duelMap.get(playerId);
+
+                if(duel == null) {
+                    sender.sendMessage(ChatColor.RED + "You have no pending requests!");
+                    return true;
+                }
+
+                duel.participants.remove(playerId);
+                duelMap.remove(playerId);
+                duel.participants.forEach((id, accepted) -> {
+                    if(accepted) {
+                        Bukkit.getPlayer(id).sendMessage(ChatColor.RED + player.getName() + " has declined the duel");
+                    }
+                });
+                if(duel.participants.size() == 1) {
+                    duelMap.remove(duel.participants.keySet().iterator().next());
+                }
+                sender.sendMessage(ChatColor.AQUA + "You have declined the duel");
+                return true;
+            }
+        }
+
+        sender.sendMessage("Command must be executed by a player");
         return true;
     }
 
@@ -75,10 +178,25 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     private void onPlayerJoin(PlayerJoinEvent event) {
         updatePlayerListName(event.getPlayer(), event.getPlayer().getWorld().getEnvironment());
+    }
 
-        // TODO
-        //duelMap.put(event.getPlayer().getUniqueId(), new Duel());
-        //duelMap.values().forEach(duel -> duel.particpants.addAll(Bukkit.getOnlinePlayers().stream().map(Entity::getUniqueId).collect(Collectors.toSet())));
+    @EventHandler(priority = EventPriority.MONITOR)
+    private void onPlayerLeave(PlayerQuitEvent event) {
+        final Player player = event.getPlayer();
+        final UUID playerId = player.getUniqueId();
+        final Duel duel = duelMap.get(playerId);
+
+        if(duel != null) {
+            duel.participants.remove(playerId);
+            duel.participants.forEach((id, accepted) -> {
+                if(accepted) {
+                    Bukkit.getPlayer(id).sendMessage(ChatColor.RED + player.getName() + " has left the duel");
+                }
+            });
+            if(duel.participants.size() == 1) {
+                duelMap.remove(duel.participants.keySet().iterator().next());
+            }
+        }
     }
 
     private void updatePlayerListName(Player player, World.Environment environment) {
@@ -131,7 +249,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
                 return;
             }
 
-            if(duel == null || !duel.particpants.contains(damager.getUniqueId())) {
+            if(duel == null || !duel.isParticipant(damager)) {
                 event.setCancelled(true);
             }
         }
