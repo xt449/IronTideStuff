@@ -12,7 +12,7 @@ class Duel {
 
 	final HashMap<UUID, Boolean> participants = new HashMap<>();
 
-	boolean started = false;
+	//boolean started = false;
 
 	public Duel(UUID creator, UUID... invitations) {
 		participants.put(creator, true);
@@ -22,6 +22,12 @@ class Duel {
 	}
 
 	boolean isParticipant(Player player) {
-		return participants.getOrDefault(player.getUniqueId(), false);
+		//return participants.getOrDefault(player.getUniqueId(), false);
+		final Boolean accepted = participants.get(player.getUniqueId());
+		if(accepted == null) {
+			return false;
+		}
+		return accepted;
+		//return participants.getOrDefault(player.getUniqueId(), false);
 	}
 }

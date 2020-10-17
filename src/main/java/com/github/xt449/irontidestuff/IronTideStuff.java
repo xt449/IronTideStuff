@@ -98,7 +98,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
                 duel = new Duel(playerId, targetId);
                 duelMap.put(playerId, duel);
                 duelMap.put(targetId, duel);
-                target.sendMessage(ChatColor.AQUA + "You have challenged " + target.getName() + " to a duel");
+                player.sendMessage(ChatColor.AQUA + "You have challenged " + target.getName() + " to a duel");
                 target.sendMessage(ChatColor.AQUA + "You have be challenged to a duel by " + player.getName() + ChatColor.GREEN + "\nTo accept: /acceptduel " + player.getName() + ChatColor.RED + "\nTo decline: /declineduel " + player.getName());
                 return true;
             } else if(command.getName().equals("leaveduel")) {
@@ -249,7 +249,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
                 return;
             }
 
-            if(duel == null || !duel.isParticipant(damager)) {
+            if(duel == null || !duel.isParticipant(target) || !duel.isParticipant(damager)) {
                 event.setCancelled(true);
             }
         }
