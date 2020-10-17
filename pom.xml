@@ -6,7 +6,7 @@
 
     <groupId>com.github.xt449</groupId>
     <artifactId>irontidestuff</artifactId>
-    <version>${minecraft.version}-1.1.1</version>
+    <version>${minecraft.version}-1.1.2</version>
 
     <name>IronTideStuff</name>
 
