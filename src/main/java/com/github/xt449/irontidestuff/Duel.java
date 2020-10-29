@@ -6,12 +6,11 @@ import java.util.HashMap;
 import java.util.UUID;
 
 /**
- * @author xt449 / BinaryBanana
+ * @author Jonathan Taclott (xt449 / BinaryBanana)
  */
 class Duel {
 
 	final HashMap<UUID, Boolean> participants = new HashMap<>();
-
 	//boolean started = false;
 
 	public Duel(UUID creator, UUID... invitations) {
@@ -28,6 +27,5 @@ class Duel {
 			return false;
 		}
 		return accepted;
-		//return participants.getOrDefault(player.getUniqueId(), false);
 	}
 }

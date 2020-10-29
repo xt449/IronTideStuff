@@ -2,6 +2,7 @@ main: ${project.groupId}.${project.artifactId}.${project.name}
 name: ${project.name}
 version: ${project.version}
 author: xt449
+load: POSTWORLD
 api-version: '1.16'
 
 commands:
@@ -21,6 +22,14 @@ commands:
     usage: /<command>
     aliases: [dueldecline,declinechallenge,challengedecline,denyduel,dueldeny,denychallenge,challengedeny]
     permission: ${project.artifactId}.command.declineduel
+  addtrade:
+    usage: /<command> <incoming item> <amount> <outgoing item> <amount>
+    aliases: [tradeadd]
+    permission: ${project.artifactId}.command.addtrade
+  removetrade:
+    usage: /<command> <row>
+    aliases: [traderemove]
+    permission: ${project.artifactId}.command.removetrade
 
 permissions:
   ${project.artifactId}.command.duel:
@@ -30,4 +39,8 @@ permissions:
   ${project.artifactId}.command.acceptduel:
     default: true
   ${project.artifactId}.command.declineduel:
+    default: true
+  ${project.artifactId}.command.addtrade:
+    default: true
+  ${project.artifactId}.command.removetrade:
     default: true
