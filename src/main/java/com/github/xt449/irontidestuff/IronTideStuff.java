@@ -331,7 +331,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 					}
 
 					try {
-						tradeStation.trades.remove(row);
+						tradeStation.trades.remove(row - 1);
 						sender.sendMessage(ChatColor.GREEN + "Trade removed");
 						return true;
 					} catch(IndexOutOfBoundsException exc) {
@@ -543,13 +543,18 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 				return;
 			}
 
-			final BlockLocation blockLocation = BlockLocation.fromLocation(event.getBlock().getLocation());
 			final BlockFace blockFace = ((Directional) event.getBlock().getBlockData()).getFacing();
-			blockLocation.x -= blockFace.getModX();
-			blockLocation.y -= blockFace.getModY();
-			blockLocation.z -= blockFace.getModZ();
-			tradeDataMap.put(blockLocation, new TradeStation(name, blockLocation));
+			final Block chestBlock = event.getBlock().getRelative(blockFace, -1);
+			if(chestBlock.getType() != Material.CHEST) {
+				return;
+			}
 
+			if(((Directional) chestBlock.getBlockData()).getFacing() != blockFace) {
+				return;
+			}
+
+			final BlockLocation location = BlockLocation.fromLocation(chestBlock.getLocation());
+			tradeDataMap.put(location, new TradeStation(name, location));
 			event.getPlayer().sendMessage(ChatColor.GREEN + "You created a new trade station");
 		}
 	}
