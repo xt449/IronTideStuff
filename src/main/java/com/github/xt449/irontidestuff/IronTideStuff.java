@@ -80,7 +80,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 				for(final Player player : Bukkit.getOnlinePlayers()) {
 					player.setPlayerListHeader(ChatColor.AQUA + "TPS: " + (tps[0] > 20 ? 20 : (int) tps[0]));
 				}
-			}, 10, 20);
+			}, 20, 10 * 20);
 		}
 
 		Bukkit.getPluginManager().registerEvents(this, this);
