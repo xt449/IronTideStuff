@@ -28,6 +28,7 @@ import org.bukkit.inventory.MerchantInventory;
 import org.bukkit.inventory.MerchantRecipe;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.projectiles.ProjectileSource;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -416,6 +417,36 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 			}
 			default: {
 				player.setPlayerListName(OTHER_PREFIX + player.getName());
+			}
+		}
+	}
+
+	private BukkitRunnable timeAccelerationTask = null;
+
+	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+	private void onPlayerBedEnter(PlayerBedEnterEvent event) {
+		if (event.getBedEnterResult() == PlayerBedEnterEvent.BedEnterResult.OK) {
+			final Collection<? extends Player> players = Bukkit.getOnlinePlayers();
+			final int sleepers = (int) (players.stream().filter(player -> player.isSleeping() || player.isSleepingIgnored()).count() + 1);
+			final float ratio = (float) sleepers / players.size();
+			Bukkit.broadcastMessage((int) (ratio * 100) + "% of players are sleeping...");
+
+			if(ratio > 0.3F) {
+				if(timeAccelerationTask == null || timeAccelerationTask.isCancelled()) {
+					timeAccelerationTask = new BukkitRunnable() {
+						final World world = event.getPlayer().getWorld();
+
+						@Override
+						public void run() {
+							final int time = (int) world.getTime();
+							world.setTime(time + 100);
+							if(time >= 23900) {
+								this.cancel();
+							}
+						}
+					};
+					timeAccelerationTask.runTaskTimer(this, 1, 1);
+				}
 			}
 		}
 	}
