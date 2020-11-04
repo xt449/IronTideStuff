@@ -429,7 +429,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 			final Collection<? extends Player> players = Bukkit.getOnlinePlayers();
 			final int sleepers = (int) (players.stream().filter(player -> player.isSleeping() || player.isSleepingIgnored()).count() + 1);
 			final float ratio = (float) sleepers / players.size();
-			Bukkit.broadcastMessage((int) (ratio * 100) + "% of players are sleeping...");
+			Bukkit.broadcastMessage(ChatColor.AQUA + ((int) (ratio * 100) + "% of players are sleeping..."));
 
 			if(ratio > 0.3F) {
 				if(timeAccelerationTask == null || timeAccelerationTask.isCancelled()) {
