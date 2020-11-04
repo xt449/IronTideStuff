@@ -21,10 +21,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerLoginEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.MerchantInventory;
@@ -57,25 +54,23 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 
 	private final HashMap<String, Material> friendlyMaterialsMap = new HashMap<>(Arrays.stream(Material.values()).filter(material -> material.isItem() && !material.isLegacy()).collect(Collectors.toMap(material -> material.getKey().getKey(), material -> material)));
 
+	double[] tps = null;
+
 	@Override
 	public void onEnable() {
-		double[] temp = null;
-
 		try {
 			Object objectDedicatedPlayerList = Bukkit.getServer().getClass().getDeclaredMethod("getHandle").invoke(Bukkit.getServer());
 			Object objectDedicatedServer = objectDedicatedPlayerList.getClass().getDeclaredMethod("getServer").invoke(objectDedicatedPlayerList);
-			temp = (double[]) objectDedicatedServer.getClass().getField("recentTps").get(objectDedicatedServer);
-			//temp = ((CraftServer) Bukkit.getServer()).getHandle().getServer().recentTps;
+			tps = (double[]) objectDedicatedServer.getClass().getField("recentTps").get(objectDedicatedServer);
+			//tps = ((CraftServer) Bukkit.getServer()).getHandle().getServer().recentTps;
 		} catch(Exception exc) {
 			exc.printStackTrace();
 		}
 
-		if(temp == null) {
+		if(tps == null) {
 			getLogger().severe("Unable to get TPS from Minecraft Server!");
 			getPluginLoader().disablePlugin(this);
 		} else {
-			final double[] tps = temp;
-
 			Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
 				for(final Player player : Bukkit.getOnlinePlayers()) {
 					player.setPlayerListHeader(ChatColor.AQUA + "TPS: " + (tps[0] > 20 ? 20 : (int) tps[0]));
@@ -373,10 +368,12 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 	}
 
 	@EventHandler(priority = EventPriority.MONITOR)
-	private void onPlayerJoin(PlayerLoginEvent event) {
+	private void onPlayerJoin(PlayerJoinEvent event) {
 		final Player player = event.getPlayer();
 
 		updatePlayerListName(player, player.getWorld().getEnvironment());
+
+		player.setPlayerListHeader(ChatColor.AQUA + "TPS: " + (tps[0] > 20 ? 20 : (int) tps[0]));
 	}
 
 	@EventHandler(priority = EventPriority.MONITOR)
@@ -385,7 +382,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 	}
 
 	@EventHandler(priority = EventPriority.MONITOR)
-	private void onPlayerLeave(PlayerQuitEvent event) {
+	private void onPlayerQuit(PlayerQuitEvent event) {
 		final Player player = event.getPlayer();
 		final UUID playerId = player.getUniqueId();
 		final Duel duel = duelMap.get(playerId);
@@ -424,7 +421,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 	}
 
 	@EventHandler(priority = EventPriority.HIGHEST)
-	private void onPlayerDamage(EntityDamageByEntityEvent event) {
+	private void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
 		if(event.getEntity() instanceof Player) {
 			final Player target = (Player) event.getEntity();
 			final Duel duel = duelMap.get(target.getUniqueId());
