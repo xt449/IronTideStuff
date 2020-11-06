@@ -1,6 +1,11 @@
 package com.github.xt449.irontidestuff;
 
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Material;
+import org.bukkit.Statistic;
+import org.bukkit.Tag;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Container;
@@ -9,6 +14,7 @@ import org.bukkit.block.data.Directional;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.TNTPrimed;
@@ -21,7 +27,12 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.player.*;
+import org.bukkit.event.player.PlayerBedEnterEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerLoginEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.MerchantInventory;
@@ -34,7 +45,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -425,13 +441,14 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	private void onPlayerBedEnter(PlayerBedEnterEvent event) {
-		if (event.getBedEnterResult() == PlayerBedEnterEvent.BedEnterResult.OK) {
+		if(event.getBedEnterResult() == PlayerBedEnterEvent.BedEnterResult.OK) {
 			final Collection<? extends Player> players = Bukkit.getOnlinePlayers();
-			final int sleepers = (int) (players.stream().filter(player -> player.isSleeping() || player.isSleepingIgnored()).count() + 1);
-			final float ratio = (float) sleepers / players.size();
-			Bukkit.broadcastMessage(ChatColor.AQUA + ((int) (ratio * 100) + "% of players are sleeping..."));
+			final int playerCount = (int) (players.stream().filter(player -> !player.isSleepingIgnored() && player.getWorld().getEnvironment() == World.Environment.NORMAL).count());
+			final List<Player> sleepingPlayers = players.stream().filter(LivingEntity::isSleeping).collect(Collectors.toList());
+			final int percentage = (sleepingPlayers.size() * 100) / playerCount;
+			Bukkit.broadcastMessage(ChatColor.AQUA + (percentage + "% of players are sleeping..."));
 
-			if(ratio > 0.3F) {
+			if(percentage > 30) {
 				if(timeAccelerationTask == null || timeAccelerationTask.isCancelled()) {
 					timeAccelerationTask = new BukkitRunnable() {
 						final World world = event.getPlayer().getWorld();
@@ -441,6 +458,9 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 							final int time = (int) world.getTime();
 							world.setTime(time + 100);
 							if(time >= 23900) {
+								for(Player player : sleepingPlayers) {
+									player.incrementStatistic(Statistic.SLEEP_IN_BED);
+								}
 								this.cancel();
 							}
 						}
