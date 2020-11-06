@@ -445,8 +445,9 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 			final Collection<? extends Player> players = Bukkit.getOnlinePlayers();
 			final int playerCount = (int) (players.stream().filter(player -> !player.isSleepingIgnored() && player.getWorld().getEnvironment() == World.Environment.NORMAL).count());
 			final List<Player> sleepingPlayers = players.stream().filter(LivingEntity::isSleeping).collect(Collectors.toList());
-			final int percentage = (sleepingPlayers.size() * 100) / playerCount;
-			Bukkit.broadcastMessage(ChatColor.AQUA + (percentage + "% of players are sleeping..."));
+			final int sleepingCount = sleepingPlayers.size() + 1;
+			final int percentage = (sleepingCount * 100) / playerCount;
+			Bukkit.broadcastMessage(ChatColor.AQUA + (percentage + "% (" + sleepingCount + "/" + playerCount + ") of players are sleeping..."));
 
 			if(percentage > 30) {
 				if(timeAccelerationTask == null || timeAccelerationTask.isCancelled()) {
