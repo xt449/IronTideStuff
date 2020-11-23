@@ -11,7 +11,6 @@ import java.util.UUID;
 class Duel {
 
 	final HashMap<UUID, Boolean> participants = new HashMap<>();
-	//boolean started = false;
 
 	public Duel(UUID creator, UUID... invitations) {
 		participants.put(creator, true);
