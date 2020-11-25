@@ -88,11 +88,22 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 			if(worldFolders[i].isDirectory()) {
 				final File[] shopFiles = worldFolders[i].listFiles();
 				for(int j = 0; j < shopFiles.length; j++) {
-					final String[] parts = shopFiles[j].getName().split(",");
-					final BlockLocation location = new BlockLocation(worldFolders[i].getName(), Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
-
 					try(final BufferedReader reader = new BufferedReader(new FileReader(shopFiles[j]))) {
-						tradeDataMap.put(location, TradeStation.deserialize(location, reader.lines().collect(Collectors.joining("\n"))));
+						final List<String> lines = reader.lines().collect(Collectors.toList());
+						if(!lines.get(0).equals(DATA_VERSION)) {
+							lines.set(0, DATA_VERSION);
+						}
+
+						try(final BufferedWriter writer = new BufferedWriter(new FileWriter(shopFiles[j], false))) {
+							writer.write(String.join("\n", lines));
+						} catch(IOException exc) {
+							exc.printStackTrace();
+						}
+
+						final String[] parts = shopFiles[j].getName().split(",");
+						final BlockLocation location = new BlockLocation(worldFolders[i].getName(), Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
+
+						tradeDataMap.put(location, TradeStation.deserialize(location, String.join("\n", lines)));
 					} catch(IOException exc) {
 						exc.printStackTrace();
 					}
@@ -336,32 +347,65 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 					sender.sendMessage(ChatColor.RED + "You must be looking at a trade station chest to add a trade");
 					return true;
 				}
-			} else if(command.getName().equals("migratetradestationdata")) {
-				final File[] worldFolders = IronTideStuff.shopsFolder.listFiles();
-				for(int i = 0; i < worldFolders.length; i++) {
-					if(worldFolders[i].isDirectory()) {
-						final File[] shopFiles = worldFolders[i].listFiles();
-						for(int j = 0; j < shopFiles.length; j++) {
-							try(final BufferedReader reader = new BufferedReader(new FileReader(shopFiles[j]))) {
-								final List<String> lines = reader.lines().collect(Collectors.toList());
-								if(!lines.get(0).equals(DATA_VERSION)) {
-									lines.set(0, DATA_VERSION);
-								}
-
-								try(final BufferedWriter writer = new BufferedWriter(new FileWriter(shopFiles[j], false))) {
-									writer.write(String.join("\n", lines));
-								} catch(IOException exc) {
-									exc.printStackTrace();
-								}
-							} catch(IOException exc) {
-								exc.printStackTrace();
-							}
-						}
-					}
+			} else if(command.getName().equals("addspecialtrade")) {
+				if(args.length < 2) {
+					return false;
 				}
 
-				sender.sendMessage(ChatColor.GREEN + "All trade station data has bee migrated to version " + DATA_VERSION);
-				return true;
+				final Player player = (Player) sender;
+				final Block block = player.getTargetBlockExact(5);
+				if(block != null && block.getType() == Material.CHEST) {
+					final Block signBlock = block.getRelative(((Directional) block.getBlockData()).getFacing());
+					if(!Tag.WALL_SIGNS.isTagged(signBlock.getType())) {
+						sender.sendMessage(ChatColor.RED + "This is not a valid trade station");
+						return true;
+					}
+
+					ignoreThisBlockBreak = true;
+					final BlockBreakEvent breakCheck = new BlockBreakEvent(block, player);
+					Bukkit.getPluginManager().callEvent(breakCheck);
+					ignoreThisBlockBreak = false;
+					// check for protection plugins preventing breaking of this block
+					if(breakCheck.isCancelled()) {
+						return true;
+					}
+
+					final TradeStation tradeStation = tradeDataMap.get(BlockLocation.fromLocation(block.getLocation()));
+					if(tradeStation == null) {
+						sender.sendMessage(ChatColor.RED + "This is not a valid trade station");
+						return true;
+					}
+					if(!tradeStation.editing) {
+						sender.sendMessage(ChatColor.RED + "You must switch to editing mode first");
+						return true;
+					}
+
+					final Material material1 = friendlyMaterialsMap.get(args[0]);
+					if(material1 == null) {
+						sender.sendMessage(ChatColor.RED + "Invalid item \"" + args[0] + '\"');
+						return true;
+					}
+					final int amount1;
+					try {
+						amount1 = Integer.parseInt(args[1]);
+						if(amount1 < 1 || amount1 > 64) {
+							sender.sendMessage(ChatColor.RED + "Amount must be between 1 and 64");
+							return true;
+						}
+					} catch(NumberFormatException exc) {
+						sender.sendMessage(ChatColor.RED + "Invalid number \"" + args[1] + '\"');
+						return true;
+					}
+
+					final MerchantRecipe trade = new MerchantRecipe(player.getEquipment().getItemInMainHand(), 0);
+					trade.addIngredient(new ItemStack(material1, amount1));
+					tradeStation.trades.add(trade);
+					sender.sendMessage(ChatColor.GREEN + "Trade added");
+					return true;
+				} else {
+					sender.sendMessage(ChatColor.RED + "You must be looking at a trade station chest to add a trade");
+					return true;
+				}
 			}
 		}
 
@@ -376,6 +420,12 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 				final String starting = args[args.length - 1];
 				return friendlyMaterialsMap.keySet().stream().filter(key -> key.startsWith(starting)).collect(Collectors.toList());
 			} else if(args.length == 2 || args.length == 4) {
+				return Collections.emptyList();
+			}
+		} else if(command.getName().equals("addspecialtrade")) {
+			if(args.length == 1) {
+				return friendlyMaterialsMap.keySet().stream().filter(key -> key.startsWith(args[0])).collect(Collectors.toList());
+			} else if(args.length == 2) {
 				return Collections.emptyList();
 			}
 		}
@@ -736,6 +786,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 	static String serializeMerchantRecipe(MerchantRecipe trade) {
 		final ItemStack input = trade.getIngredients().get(0);
 		final ItemStack output = trade.getResult();
+		//     DIAMOND                  _          1                   _          IRON_INGOT                _          64
 		return input.getType().name() + '\u0000' + input.getAmount() + '\u0000' + output.getType().name() + '\u0000' + output.getAmount();
 	}
 

@@ -34,9 +34,6 @@ commands:
     usage: /<command> <row>
     aliases: [traderemove]
     permission: ${project.artifactId}.command.removetrade
-  migratetradestationdata:
-    usage: /<command>
-    permission: ${project.artifactId}.command.migratetradestationdata
 
 permissions:
   ${project.artifactId}.command.duel:
@@ -53,5 +50,3 @@ permissions:
     default: true
   ${project.artifactId}.command.removetrade:
     default: true
-  ${project.artifactId}.command.migratetradestationdata:
-    default: op
