@@ -26,10 +26,17 @@ commands:
     usage: /<command> <incoming item> <amount> <outgoing item> <amount>
     aliases: [tradeadd]
     permission: ${project.artifactId}.command.addtrade
+  addspecialtrade:
+    usage: /<command> <incoming item> <amount>
+    aliases: [tradeaddspecial]
+    permission: ${project.artifactId}.command.addspecialtrade
   removetrade:
     usage: /<command> <row>
     aliases: [traderemove]
     permission: ${project.artifactId}.command.removetrade
+  migratetradestationdata:
+    usage: /<command>
+    permission: ${project.artifactId}.command.migratetradestationdata
 
 permissions:
   ${project.artifactId}.command.duel:
@@ -42,5 +49,9 @@ permissions:
     default: true
   ${project.artifactId}.command.addtrade:
     default: true
+  ${project.artifactId}.command.addspecialtrade:
+    default: true
   ${project.artifactId}.command.removetrade:
     default: true
+  ${project.artifactId}.command.migratetradestationdata:
+    default: op

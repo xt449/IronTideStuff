@@ -11,9 +11,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -23,35 +21,30 @@ class TradeStation {
 
 	static final HashMap<UUID, BlockLocation> activeTradesMap = new HashMap<>();
 
-	final String name;
 	final BlockLocation location;
-	final LinkedList<Trade> trades;
+	final List<MerchantRecipe> trades;
 
 	boolean editing = false;
 
-	TradeStation(String name, BlockLocation location) {
-		this.name = name;
+	TradeStation(BlockLocation location) {
 		this.location = location;
 		this.trades = new LinkedList<>();
 	}
 
-	TradeStation(String name, BlockLocation location, LinkedList<Trade> trades) {
-		this.name = name;
+	TradeStation(BlockLocation location, List<MerchantRecipe> trades) {
 		this.location = location;
 		this.trades = trades;
 	}
 
 	void openMerchant(Player player) {
-		final Merchant merchant = Bukkit.createMerchant(name);
-		merchant.setRecipes(trades.stream().map(trade -> {
-			final MerchantRecipe recipe = trade.recipe;
-			final Inventory inventory = ((Container) Bukkit.getWorld(location.worldName).getBlockAt(location.x, location.y, location.z).getState()).getInventory();
-			if(inventory.containsAtLeast(trade.outputItem, trade.outputItem.getAmount()) && IronTideStuff.inventoryHasRoom(inventory, trade.inputItem)) {
-				recipe.setMaxUses(Integer.MAX_VALUE);
+		final Merchant merchant = Bukkit.createMerchant("Trade Station");
+		final Inventory inventory = ((Container) Bukkit.getWorld(location.worldName).getBlockAt(location.x, location.y, location.z).getState()).getInventory();
+		merchant.setRecipes(trades.stream().peek(trade -> {
+			if(inventory.containsAtLeast(trade.getResult(), trade.getResult().getAmount()) && IronTideStuff.inventoryHasRoom(inventory, trade.getIngredients().get(0))) {
+				trade.setMaxUses(Integer.MAX_VALUE);
 			} else {
-				recipe.setMaxUses(0);
+				trade.setMaxUses(0);
 			}
-			return recipe;
 		}).collect(Collectors.toList()));
 
 		player.openMerchant(merchant, true);
@@ -76,22 +69,16 @@ class TradeStation {
 	}
 
 	String serialize() {
-		return name + '\n' + trades.stream().map(Trade::serialize).collect(Collectors.joining("\n"));
+		return trades.stream().map(IronTideStuff::serializeMerchantRecipe).collect(Collectors.joining("\n"));
 	}
 
-	static TradeStation deserialize(BlockLocation location, String text) {
-		final String[] parts = text.split("\n");
-
-		final LinkedList<Trade> trades = new LinkedList<>();
-
-		for(int i = 1; i < parts.length; i++) {
+	static TradeStation deserialize(BlockLocation location, String text) throws IllegalArgumentException {
+		return new TradeStation(location, Arrays.stream(text.split("\n")).map(tradeText -> {
 			try {
-				trades.add(Trade.deserialize(parts[i]));
-			} catch(IllegalArgumentException exc) {
-				Bukkit.getLogger().warning("Error reading trade from data at " + location.toString());
+				return IronTideStuff.deserializeMerchantRecipe(tradeText);
+			} catch(Exception exc) {
+				throw new IllegalArgumentException("Error reading trade from data at " + location.toString());
 			}
-		}
-
-		return new TradeStation(parts[0], location, trades);
+		}).collect(Collectors.toList()));
 	}
 }

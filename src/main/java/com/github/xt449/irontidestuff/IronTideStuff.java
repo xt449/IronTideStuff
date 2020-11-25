@@ -29,10 +29,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import org.spigotmc.event.entity.EntityDismountEvent;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -41,6 +38,7 @@ import java.util.stream.Collectors;
  */
 public final class IronTideStuff extends JavaPlugin implements Listener {
 
+	private static final String DATA_VERSION = "v0";
 	private static final String SIGN_TRADE_HEADER = "[Trade]";
 	private static final String OVERWORLD_PREFIX = ChatColor.GREEN + "Overworld " + ChatColor.WHITE;
 	private static final String NETHER_PREFIX = ChatColor.RED + "Nether " + ChatColor.WHITE;
@@ -54,7 +52,9 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 
 	private final HashMap<String, Material> friendlyMaterialsMap = new HashMap<>(Arrays.stream(Material.values()).filter(material -> material.isItem() && !material.isLegacy()).collect(Collectors.toMap(material -> material.getKey().getKey(), material -> material)));
 
-	double[] tps = null;
+	private boolean ignoreThisBlockBreak = false;
+	private double[] tps = null;
+	private BukkitRunnable timeAccelerationTask = null;
 
 	@Override
 	public void onEnable() {
@@ -88,14 +88,11 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 			if(worldFolders[i].isDirectory()) {
 				final File[] shopFiles = worldFolders[i].listFiles();
 				for(int j = 0; j < shopFiles.length; j++) {
-					final StringBuilder builder = new StringBuilder();
+					final String[] parts = shopFiles[j].getName().split(",");
+					final BlockLocation location = new BlockLocation(worldFolders[i].getName(), Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
+
 					try(final BufferedReader reader = new BufferedReader(new FileReader(shopFiles[j]))) {
-						while(reader.ready()) {
-							builder.append(reader.readLine()).append('\n');
-						}
-						final String[] parts = shopFiles[j].getName().split(",");
-						final BlockLocation location = new BlockLocation(worldFolders[i].getName(), Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
-						tradeDataMap.put(location, TradeStation.deserialize(location, builder.toString()));
+						tradeDataMap.put(location, TradeStation.deserialize(location, reader.lines().collect(Collectors.joining("\n"))));
 					} catch(IOException exc) {
 						exc.printStackTrace();
 					}
@@ -225,10 +222,10 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 						return true;
 					}
 
-					ignoreBlockBreak = true;
+					ignoreThisBlockBreak = true;
 					final BlockBreakEvent breakCheck = new BlockBreakEvent(block, player);
 					Bukkit.getPluginManager().callEvent(breakCheck);
-					ignoreBlockBreak = false;
+					ignoreThisBlockBreak = false;
 					// check for protection plugins preventing breaking of this block
 					if(breakCheck.isCancelled()) {
 						return true;
@@ -277,7 +274,9 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 						return true;
 					}
 
-					tradeStation.trades.add(new Trade(new ItemStack(material1, amount1), new ItemStack(material2, amount2)));
+					final MerchantRecipe trade = new MerchantRecipe(new ItemStack(material2, amount2), 0);
+					trade.addIngredient(new ItemStack(material1, amount1));
+					tradeStation.trades.add(trade);
 					sender.sendMessage(ChatColor.GREEN + "Trade added");
 					return true;
 				} else {
@@ -298,10 +297,10 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 						return true;
 					}
 
-					ignoreBlockBreak = true;
+					ignoreThisBlockBreak = true;
 					final BlockBreakEvent breakCheck = new BlockBreakEvent(block, player);
 					Bukkit.getPluginManager().callEvent(breakCheck);
-					ignoreBlockBreak = false;
+					ignoreThisBlockBreak = false;
 					// check for protection plugins preventing breaking of this block
 					if(breakCheck.isCancelled()) {
 						return true;
@@ -337,6 +336,32 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 					sender.sendMessage(ChatColor.RED + "You must be looking at a trade station chest to add a trade");
 					return true;
 				}
+			} else if(command.getName().equals("migratetradestationdata")) {
+				final File[] worldFolders = IronTideStuff.shopsFolder.listFiles();
+				for(int i = 0; i < worldFolders.length; i++) {
+					if(worldFolders[i].isDirectory()) {
+						final File[] shopFiles = worldFolders[i].listFiles();
+						for(int j = 0; j < shopFiles.length; j++) {
+							try(final BufferedReader reader = new BufferedReader(new FileReader(shopFiles[j]))) {
+								final List<String> lines = reader.lines().collect(Collectors.toList());
+								if(!lines.get(0).equals(DATA_VERSION)) {
+									lines.set(0, DATA_VERSION);
+								}
+
+								try(final BufferedWriter writer = new BufferedWriter(new FileWriter(shopFiles[j], false))) {
+									writer.write(String.join("\n", lines));
+								} catch(IOException exc) {
+									exc.printStackTrace();
+								}
+							} catch(IOException exc) {
+								exc.printStackTrace();
+							}
+						}
+					}
+				}
+
+				sender.sendMessage(ChatColor.GREEN + "All trade station data has bee migrated to version " + DATA_VERSION);
+				return true;
 			}
 		}
 
@@ -410,28 +435,6 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 			}
 		}
 	}
-
-	private void updatePlayerListName(Player player, World.Environment environment) {
-		switch(environment) {
-			case NORMAL: {
-				player.setPlayerListName(OVERWORLD_PREFIX + player.getName());
-				break;
-			}
-			case NETHER: {
-				player.setPlayerListName(NETHER_PREFIX + player.getName());
-				break;
-			}
-			case THE_END: {
-				player.setPlayerListName(END_PREFIX + player.getName());
-				break;
-			}
-			default: {
-				player.setPlayerListName(OTHER_PREFIX + player.getName());
-			}
-		}
-	}
-
-	private BukkitRunnable timeAccelerationTask = null;
 
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	private void onPlayerBedEnter(PlayerBedEnterEvent event) {
@@ -546,10 +549,10 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 
 				if(event.useInteractedBlock() != Event.Result.DENY) {
 					if(!event.getPlayer().isSneaking()) {
-						ignoreBlockBreak = true;
+						ignoreThisBlockBreak = true;
 						final BlockBreakEvent breakCheck = new BlockBreakEvent(block, event.getPlayer());
 						Bukkit.getPluginManager().callEvent(breakCheck);
-						ignoreBlockBreak = false;
+						ignoreThisBlockBreak = false;
 						// check for protection plugins preventing breaking of this block
 						if(!breakCheck.isCancelled()) {
 							tradeStation.editing = !tradeStation.editing;
@@ -580,24 +583,20 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 		}
 
 		if(SIGN_TRADE_HEADER.equals(event.getLine(0))) {
-			final String name = event.getLine(1);
-			if(name == null || name.length() == 0) {
-				event.getPlayer().sendMessage(ChatColor.RED + "You must specify a name for this trade station");
-				return;
-			}
-
 			final BlockFace blockFace = ((Directional) event.getBlock().getBlockData()).getFacing();
 			final Block chestBlock = event.getBlock().getRelative(blockFace, -1);
 			if(chestBlock.getType() != Material.CHEST) {
+				event.getPlayer().sendMessage(ChatColor.RED + "You must place the sign against a chest");
 				return;
 			}
 
 			if(((Directional) chestBlock.getBlockData()).getFacing() != blockFace) {
+				event.getPlayer().sendMessage(ChatColor.RED + "You must place the sign against the front of the chest");
 				return;
 			}
 
 			final BlockLocation location = BlockLocation.fromLocation(chestBlock.getLocation());
-			tradeDataMap.put(location, new TradeStation(name, location));
+			tradeDataMap.put(location, new TradeStation(location));
 			event.getPlayer().sendMessage(ChatColor.GREEN + "You created a new trade station");
 		}
 	}
@@ -674,11 +673,9 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 		}
 	}
 
-	private boolean ignoreBlockBreak = false;
-
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	private void onBlockBreak(BlockBreakEvent event) {
-		if(ignoreBlockBreak) {
+		if(ignoreThisBlockBreak) {
 			return;
 		}
 
@@ -694,6 +691,26 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 			final Block chestBlock = block.getRelative(((Directional) block.getBlockData()).getFacing(), -1);
 			if(chestBlock.getType() == Material.CHEST) {
 				tradeDataMap.remove(BlockLocation.fromLocation(chestBlock.getLocation()));
+			}
+		}
+	}
+
+	private void updatePlayerListName(Player player, World.Environment environment) {
+		switch(environment) {
+			case NORMAL: {
+				player.setPlayerListName(OVERWORLD_PREFIX + player.getName());
+				break;
+			}
+			case NETHER: {
+				player.setPlayerListName(NETHER_PREFIX + player.getName());
+				break;
+			}
+			case THE_END: {
+				player.setPlayerListName(END_PREFIX + player.getName());
+				break;
+			}
+			default: {
+				player.setPlayerListName(OTHER_PREFIX + player.getName());
 			}
 		}
 	}
@@ -714,5 +731,24 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 			}
 		}
 		return false;
+	}
+
+	static String serializeMerchantRecipe(MerchantRecipe trade) {
+		final ItemStack input = trade.getIngredients().get(0);
+		final ItemStack output = trade.getResult();
+		return input.getType().name() + '\u0000' + input.getAmount() + '\u0000' + output.getType().name() + '\u0000' + output.getAmount();
+	}
+
+	static MerchantRecipe deserializeMerchantRecipe(String text) {
+		try {
+			String[] parts = text.split("\u0000");
+
+			final MerchantRecipe trade = new MerchantRecipe(new ItemStack(Material.getMaterial(parts[2]), Integer.parseInt(parts[3])), 0);
+			trade.setIngredients(Collections.singletonList(new ItemStack(Material.getMaterial(parts[0]), Integer.parseInt(parts[1]))));
+
+			return trade;
+		} catch(Exception exc) {
+			throw new IllegalArgumentException(exc);
+		}
 	}
 }
