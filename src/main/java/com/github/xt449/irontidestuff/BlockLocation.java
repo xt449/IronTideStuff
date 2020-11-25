@@ -1,8 +1,7 @@
 package com.github.xt449.irontidestuff;
 
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 
 import java.util.Objects;
 
@@ -36,11 +35,8 @@ class BlockLocation {
 		return Objects.hash(worldName, x, y, z);
 	}
 
-	static BlockLocation fromLocation(Location location) {
-		World world = location.getWorld();
-		if(world == null) {
-			world = Bukkit.getWorlds().get(0);
-		}
-		return new BlockLocation(world.getName(), location.getBlockX(), location.getBlockY(), location.getBlockZ());
+	static BlockLocation atBlock(Block block) {
+		World world = block.getWorld();
+		return new BlockLocation(world.getName(), block.getX(), block.getY(), block.getZ());
 	}
 }

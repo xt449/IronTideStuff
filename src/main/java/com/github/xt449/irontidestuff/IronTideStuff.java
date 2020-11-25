@@ -92,18 +92,20 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 						final List<String> lines = reader.lines().collect(Collectors.toList());
 						if(!lines.get(0).equals(DATA_VERSION)) {
 							lines.set(0, DATA_VERSION);
+
+							try(final BufferedWriter writer = new BufferedWriter(new FileWriter(shopFiles[j], false))) {
+								writer.write(String.join("\n", lines));
+							} catch(IOException exc) {
+								exc.printStackTrace();
+							}
 						}
 
-						try(final BufferedWriter writer = new BufferedWriter(new FileWriter(shopFiles[j], false))) {
-							writer.write(String.join("\n", lines));
-						} catch(IOException exc) {
-							exc.printStackTrace();
-						}
+						lines.remove(0);
 
 						final String[] parts = shopFiles[j].getName().split(",");
 						final BlockLocation location = new BlockLocation(worldFolders[i].getName(), Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
 
-						tradeDataMap.put(location, TradeStation.deserialize(location, String.join("\n", lines)));
+						tradeDataMap.put(location, TradeStation.deserialize(location, lines));
 					} catch(IOException exc) {
 						exc.printStackTrace();
 					}
@@ -242,7 +244,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 						return true;
 					}
 
-					final TradeStation tradeStation = tradeDataMap.get(BlockLocation.fromLocation(block.getLocation()));
+					final TradeStation tradeStation = tradeDataMap.get(BlockLocation.atBlock(block));
 					if(tradeStation == null) {
 						sender.sendMessage(ChatColor.RED + "This is not a valid trade station");
 						return true;
@@ -317,7 +319,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 						return true;
 					}
 
-					final TradeStation tradeStation = tradeDataMap.get(BlockLocation.fromLocation(block.getLocation()));
+					final TradeStation tradeStation = tradeDataMap.get(BlockLocation.atBlock(block));
 					if(tradeStation == null) {
 						sender.sendMessage(ChatColor.RED + "This is not a valid trade station");
 						return true;
@@ -370,7 +372,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 						return true;
 					}
 
-					final TradeStation tradeStation = tradeDataMap.get(BlockLocation.fromLocation(block.getLocation()));
+					final TradeStation tradeStation = tradeDataMap.get(BlockLocation.atBlock(block));
 					if(tradeStation == null) {
 						sender.sendMessage(ChatColor.RED + "This is not a valid trade station");
 						return true;
@@ -572,7 +574,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 					return;
 				}
 
-				final TradeStation tradeStation = tradeDataMap.get(BlockLocation.fromLocation(block.getLocation()));
+				final TradeStation tradeStation = tradeDataMap.get(BlockLocation.atBlock(block));
 				if(tradeStation == null) {
 					return;
 				}
@@ -592,7 +594,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 					return;
 				}
 
-				final TradeStation tradeStation = tradeDataMap.get(BlockLocation.fromLocation(chestBlock.getLocation()));
+				final TradeStation tradeStation = tradeDataMap.get(BlockLocation.atBlock(chestBlock));
 				if(tradeStation == null) {
 					return;
 				}
@@ -645,7 +647,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 				return;
 			}
 
-			final BlockLocation location = BlockLocation.fromLocation(chestBlock.getLocation());
+			final BlockLocation location = BlockLocation.atBlock(chestBlock);
 			tradeDataMap.put(location, new TradeStation(location));
 			event.getPlayer().sendMessage(ChatColor.GREEN + "You created a new trade station");
 		}
@@ -734,13 +736,13 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 		if(block.getType() == Material.CHEST) {
 			// Chest
 
-			tradeDataMap.remove(BlockLocation.fromLocation(event.getBlock().getLocation()));
+			tradeDataMap.remove(BlockLocation.atBlock(block));
 		} else if(Tag.WALL_SIGNS.isTagged(block.getType())) {
 			// Sign
 
 			final Block chestBlock = block.getRelative(((Directional) block.getBlockData()).getFacing(), -1);
 			if(chestBlock.getType() == Material.CHEST) {
-				tradeDataMap.remove(BlockLocation.fromLocation(chestBlock.getLocation()));
+				tradeDataMap.remove(BlockLocation.atBlock(chestBlock));
 			}
 		}
 	}
@@ -791,15 +793,11 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 	}
 
 	static MerchantRecipe deserializeMerchantRecipe(String text) {
-		try {
-			String[] parts = text.split("\u0000");
+		String[] parts = text.split("\u0000");
 
-			final MerchantRecipe trade = new MerchantRecipe(new ItemStack(Material.getMaterial(parts[2]), Integer.parseInt(parts[3])), 0);
-			trade.setIngredients(Collections.singletonList(new ItemStack(Material.getMaterial(parts[0]), Integer.parseInt(parts[1]))));
+		final MerchantRecipe trade = new MerchantRecipe(new ItemStack(Material.getMaterial(parts[2]), Integer.parseInt(parts[3])), 0);
+		trade.setIngredients(Collections.singletonList(new ItemStack(Material.getMaterial(parts[0]), Integer.parseInt(parts[1]))));
 
-			return trade;
-		} catch(Exception exc) {
-			throw new IllegalArgumentException(exc);
-		}
+		return trade;
 	}
 }

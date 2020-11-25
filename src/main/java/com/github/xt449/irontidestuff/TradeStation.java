@@ -11,7 +11,10 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -72,13 +75,7 @@ class TradeStation {
 		return trades.stream().map(IronTideStuff::serializeMerchantRecipe).collect(Collectors.joining("\n"));
 	}
 
-	static TradeStation deserialize(BlockLocation location, String text) throws IllegalArgumentException {
-		return new TradeStation(location, Arrays.stream(text.split("\n")).map(tradeText -> {
-			try {
-				return IronTideStuff.deserializeMerchantRecipe(tradeText);
-			} catch(Exception exc) {
-				throw new IllegalArgumentException("Error reading trade from data at " + location.toString());
-			}
-		}).collect(Collectors.toList()));
+	static TradeStation deserialize(BlockLocation location, List<String> lines) {
+		return new TradeStation(location, lines.stream().map(IronTideStuff::deserializeMerchantRecipe).collect(Collectors.toList()));
 	}
 }
