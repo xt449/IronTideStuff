@@ -399,7 +399,13 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 						return true;
 					}
 
-					final MerchantRecipe trade = new MerchantRecipe(player.getEquipment().getItemInMainHand(), 0);
+					final ItemStack handItem = player.getEquipment().getItemInMainHand();
+					if(handItem == null || handItem.getType() == Material.AIR) {
+						sender.sendMessage(ChatColor.RED + "You must be holding an item in your main hand");
+						return true;
+					}
+
+					final MerchantRecipe trade = new MerchantRecipe(handItem, 0);
 					trade.addIngredient(new ItemStack(material1, amount1));
 					tradeStation.trades.add(trade);
 					sender.sendMessage(ChatColor.GREEN + "Trade added");
@@ -511,6 +517,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 								for(Player player : sleepingPlayers) {
 									player.incrementStatistic(Statistic.SLEEP_IN_BED);
 								}
+								world.setWeatherDuration(0);
 								this.cancel();
 							}
 						}
