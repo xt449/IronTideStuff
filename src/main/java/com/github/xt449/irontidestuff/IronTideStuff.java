@@ -8,6 +8,7 @@ import org.bukkit.block.Sign;
 import org.bukkit.block.data.Directional;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.serialization.ConfigurationSerialization;
 import org.bukkit.entity.*;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
@@ -29,7 +30,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import org.spigotmc.event.entity.EntityDismountEvent;
 
-import java.io.*;
+import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -38,14 +39,15 @@ import java.util.stream.Collectors;
  */
 public final class IronTideStuff extends JavaPlugin implements Listener {
 
-	private static final String DATA_VERSION = "v0";
 	private static final String SIGN_TRADE_HEADER = "[Trade]";
 	private static final String OVERWORLD_PREFIX = ChatColor.GREEN + "Overworld " + ChatColor.WHITE;
 	private static final String NETHER_PREFIX = ChatColor.RED + "Nether " + ChatColor.WHITE;
 	private static final String END_PREFIX = ChatColor.YELLOW + "End " + ChatColor.WHITE;
 	private static final String OTHER_PREFIX = ChatColor.GRAY + "Other " + ChatColor.WHITE;
 
-	static File shopsFolder;
+	static IronTideStuff instance;
+
+	File innerDataFolder;
 
 	private final HashMap<UUID, Duel> duelMap = new HashMap<>();
 	private final HashMap<BlockLocation, TradeStation> tradeDataMap = new HashMap<>();
@@ -58,6 +60,8 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 
 	@Override
 	public void onEnable() {
+		IronTideStuff.instance = this;
+
 		try {
 			Object objectDedicatedPlayerList = Bukkit.getServer().getClass().getDeclaredMethod("getHandle").invoke(Bukkit.getServer());
 			Object objectDedicatedServer = objectDedicatedPlayerList.getClass().getDeclaredMethod("getServer").invoke(objectDedicatedPlayerList);
@@ -68,8 +72,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 		}
 
 		if(tps == null) {
-			getLogger().severe("Unable to get TPS from Minecraft Server!");
-			getPluginLoader().disablePlugin(this);
+			getLogger().severe("Unable to get TPS from Minecraft Server! TPS will not be shown in player list");
 		} else {
 			Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
 				for(final Player player : Bukkit.getOnlinePlayers()) {
@@ -78,40 +81,28 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 			}, 20, 10 * 20);
 		}
 
-		Bukkit.getPluginManager().registerEvents(this, this);
+		innerDataFolder = new File(getDataFolder(), "data");
+		innerDataFolder.mkdirs();
 
-		IronTideStuff.shopsFolder = new File(getDataFolder(), "shops");
-		IronTideStuff.shopsFolder.mkdirs();
+		ConfigurationSerialization.registerClass(TradeConfigurationSection.class, "trade");
 
-		final File[] worldFolders = IronTideStuff.shopsFolder.listFiles();
+		final File[] worldFolders = innerDataFolder.listFiles();
 		for(int i = 0; i < worldFolders.length; i++) {
 			if(worldFolders[i].isDirectory()) {
 				final File[] shopFiles = worldFolders[i].listFiles();
 				for(int j = 0; j < shopFiles.length; j++) {
-					try(final BufferedReader reader = new BufferedReader(new FileReader(shopFiles[j]))) {
-						final List<String> lines = reader.lines().collect(Collectors.toList());
-						if(!lines.get(0).equals(DATA_VERSION)) {
-							lines.set(0, DATA_VERSION);
+					final String[] parts = shopFiles[j].getName().split(",");
+					final BlockLocation location = new BlockLocation(worldFolders[i].getName(), Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
 
-							try(final BufferedWriter writer = new BufferedWriter(new FileWriter(shopFiles[j], false))) {
-								writer.write(String.join("\n", lines));
-							} catch(IOException exc) {
-								exc.printStackTrace();
-							}
-						}
+					final TradeStation tradeStation = new TradeStation(location, shopFiles[j]);
+					tradeStation.load();
 
-						lines.remove(0);
-
-						final String[] parts = shopFiles[j].getName().split(",");
-						final BlockLocation location = new BlockLocation(worldFolders[i].getName(), Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
-
-						tradeDataMap.put(location, TradeStation.deserialize(location, lines));
-					} catch(IOException exc) {
-						exc.printStackTrace();
-					}
+					tradeDataMap.put(location, tradeStation);
 				}
 			}
 		}
+
+		Bukkit.getPluginManager().registerEvents(this, this);
 	}
 
 	@Override
@@ -222,7 +213,7 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 				sender.sendMessage(ChatColor.AQUA + "You have declined the duel");
 				return true;
 			} else if(command.getName().equals("addtrade")) {
-				if(args.length < 4) {
+				if(args.length < 2) {
 					return false;
 				}
 
@@ -270,24 +261,14 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 						sender.sendMessage(ChatColor.RED + "Invalid number \"" + args[1] + '\"');
 						return true;
 					}
-					final Material material2 = friendlyMaterialsMap.get(args[2]);
-					if(material2 == null) {
-						sender.sendMessage(ChatColor.RED + "Invalid item \"" + args[2] + '\"');
-						return true;
-					}
-					final int amount2;
-					try {
-						amount2 = Integer.parseInt(args[3]);
-						if(amount2 < 1 || amount2 > 64) {
-							sender.sendMessage(ChatColor.RED + "Amount must be between 1 and 64");
-							return true;
-						}
-					} catch(NumberFormatException exc) {
-						sender.sendMessage(ChatColor.RED + "Invalid number \"" + args[3] + '\"');
+
+					final ItemStack handItem = player.getEquipment().getItemInMainHand();
+					if(handItem == null || handItem.getType() == Material.AIR) {
+						sender.sendMessage(ChatColor.RED + "You must be holding an item in your main hand");
 						return true;
 					}
 
-					final MerchantRecipe trade = new MerchantRecipe(new ItemStack(material2, amount2), 0);
+					final MerchantRecipe trade = new MerchantRecipe(handItem.clone(), 0);
 					trade.addIngredient(new ItemStack(material1, amount1));
 					tradeStation.trades.add(trade);
 					sender.sendMessage(ChatColor.GREEN + "Trade added");
@@ -349,71 +330,6 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 					sender.sendMessage(ChatColor.RED + "You must be looking at a trade station chest to add a trade");
 					return true;
 				}
-			} else if(command.getName().equals("addspecialtrade")) {
-				if(args.length < 2) {
-					return false;
-				}
-
-				final Player player = (Player) sender;
-				final Block block = player.getTargetBlockExact(5);
-				if(block != null && block.getType() == Material.CHEST) {
-					final Block signBlock = block.getRelative(((Directional) block.getBlockData()).getFacing());
-					if(!Tag.WALL_SIGNS.isTagged(signBlock.getType())) {
-						sender.sendMessage(ChatColor.RED + "This is not a valid trade station");
-						return true;
-					}
-
-					ignoreThisBlockBreak = true;
-					final BlockBreakEvent breakCheck = new BlockBreakEvent(block, player);
-					Bukkit.getPluginManager().callEvent(breakCheck);
-					ignoreThisBlockBreak = false;
-					// check for protection plugins preventing breaking of this block
-					if(breakCheck.isCancelled()) {
-						return true;
-					}
-
-					final TradeStation tradeStation = tradeDataMap.get(BlockLocation.atBlock(block));
-					if(tradeStation == null) {
-						sender.sendMessage(ChatColor.RED + "This is not a valid trade station");
-						return true;
-					}
-					if(!tradeStation.editing) {
-						sender.sendMessage(ChatColor.RED + "You must switch to editing mode first");
-						return true;
-					}
-
-					final Material material1 = friendlyMaterialsMap.get(args[0]);
-					if(material1 == null) {
-						sender.sendMessage(ChatColor.RED + "Invalid item \"" + args[0] + '\"');
-						return true;
-					}
-					final int amount1;
-					try {
-						amount1 = Integer.parseInt(args[1]);
-						if(amount1 < 1 || amount1 > 64) {
-							sender.sendMessage(ChatColor.RED + "Amount must be between 1 and 64");
-							return true;
-						}
-					} catch(NumberFormatException exc) {
-						sender.sendMessage(ChatColor.RED + "Invalid number \"" + args[1] + '\"');
-						return true;
-					}
-
-					final ItemStack handItem = player.getEquipment().getItemInMainHand();
-					if(handItem == null || handItem.getType() == Material.AIR) {
-						sender.sendMessage(ChatColor.RED + "You must be holding an item in your main hand");
-						return true;
-					}
-
-					final MerchantRecipe trade = new MerchantRecipe(handItem, 0);
-					trade.addIngredient(new ItemStack(material1, amount1));
-					tradeStation.trades.add(trade);
-					sender.sendMessage(ChatColor.GREEN + "Trade added");
-					return true;
-				} else {
-					sender.sendMessage(ChatColor.RED + "You must be looking at a trade station chest to add a trade");
-					return true;
-				}
 			}
 		}
 
@@ -456,7 +372,9 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 
 		updatePlayerListName(player, player.getWorld().getEnvironment());
 
-		player.setPlayerListHeader(ChatColor.AQUA + "TPS: " + (tps[0] > 20 ? 20 : (int) tps[0]));
+		if(tps != null) {
+			player.setPlayerListHeader(ChatColor.AQUA + "TPS: " + (tps[0] > 20 ? 20 : (int) tps[0]));
+		}
 	}
 
 	@EventHandler(priority = EventPriority.MONITOR)
@@ -573,6 +491,12 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 				return;
 			}
 
+			final Player player = event.getPlayer();
+
+			if(player.isSneaking()) {
+				return;
+			}
+
 			if(block.getType() == Material.CHEST) {
 				// Chest
 
@@ -587,7 +511,6 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 				}
 
 				if(!tradeStation.editing) {
-					final Player player = event.getPlayer();
 					tradeStation.openMerchant(player);
 
 					event.setUseInteractedBlock(Event.Result.DENY);
@@ -607,28 +530,26 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 				}
 
 				if(event.useInteractedBlock() != Event.Result.DENY) {
-					if(!event.getPlayer().isSneaking()) {
-						ignoreThisBlockBreak = true;
-						final BlockBreakEvent breakCheck = new BlockBreakEvent(block, event.getPlayer());
-						Bukkit.getPluginManager().callEvent(breakCheck);
-						ignoreThisBlockBreak = false;
-						// check for protection plugins preventing breaking of this block
-						if(!breakCheck.isCancelled()) {
-							tradeStation.editing = !tradeStation.editing;
-							final Sign sign = (Sign) block.getState();
-							if(tradeStation.editing) {
-								sign.setLine(0, "[Editing]");
-								sign.update();
-								event.getPlayer().sendMessage(ChatColor.AQUA + "Trade station switched to editing mode");
-							} else {
-								sign.setLine(0, SIGN_TRADE_HEADER);
-								sign.update();
-								event.getPlayer().sendMessage(ChatColor.AQUA + "Trade station switched to standard mode");
-							}
-
-							event.setUseInteractedBlock(Event.Result.DENY);
-							event.setCancelled(true);
+					ignoreThisBlockBreak = true;
+					final BlockBreakEvent breakCheck = new BlockBreakEvent(block, player);
+					Bukkit.getPluginManager().callEvent(breakCheck);
+					ignoreThisBlockBreak = false;
+					// check for protection plugins preventing breaking of this block
+					if(!breakCheck.isCancelled()) {
+						tradeStation.editing = !tradeStation.editing;
+						final Sign sign = (Sign) block.getState();
+						if(tradeStation.editing) {
+							sign.setLine(0, "[Editing]");
+							sign.update();
+							player.sendMessage(ChatColor.AQUA + "Trade station switched to editing mode");
+						} else {
+							sign.setLine(0, SIGN_TRADE_HEADER);
+							sign.update();
+							player.sendMessage(ChatColor.AQUA + "Trade station switched to standard mode");
 						}
+
+						event.setUseInteractedBlock(Event.Result.DENY);
+						event.setCancelled(true);
 					}
 				}
 			}
@@ -790,21 +711,5 @@ public final class IronTideStuff extends JavaPlugin implements Listener {
 			}
 		}
 		return false;
-	}
-
-	static String serializeMerchantRecipe(MerchantRecipe trade) {
-		final ItemStack input = trade.getIngredients().get(0);
-		final ItemStack output = trade.getResult();
-		//     DIAMOND                  _          1                   _          IRON_INGOT                _          64
-		return input.getType().name() + '\u0000' + input.getAmount() + '\u0000' + output.getType().name() + '\u0000' + output.getAmount();
-	}
-
-	static MerchantRecipe deserializeMerchantRecipe(String text) {
-		String[] parts = text.split("\u0000");
-
-		final MerchantRecipe trade = new MerchantRecipe(new ItemStack(Material.getMaterial(parts[2]), Integer.parseInt(parts[3])), 0);
-		trade.setIngredients(Collections.singletonList(new ItemStack(Material.getMaterial(parts[0]), Integer.parseInt(parts[1]))));
-
-		return trade;
 	}
 }
